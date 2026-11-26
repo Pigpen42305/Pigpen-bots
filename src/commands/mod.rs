@@ -1,5 +1,6 @@
 mod awa;
 mod bytes;
+mod source;
 
 pub type DiscordOutput = (Option<&'static str>, String);
 
@@ -14,6 +15,8 @@ pub enum Commands {
     Bytes(bytes::Command),
     /// Summon an awawa pyramid...
     Awa(awa::Command),
+    /// Get a link to this bot's repository!
+    Source(source::Command),
 }
 impl Commands {
     pub fn execute(self) -> Result<DiscordOutput, !> {
@@ -21,6 +24,7 @@ impl Commands {
         match self {
             Commands::Bytes(cmd) => cmd.execute(),
             Commands::Awa(cmd) => cmd.execute(),
+            Commands::Source(cmd) => cmd.execute(),
             _ => unreachable!(),
         }
     }
