@@ -1,12 +1,9 @@
 use serenity::{
     Error as SerenityError,
-    all::{Context, Message, ModelError},
+    all::{Context, CreateMessage, Message, MessageFlags, ModelError},
 };
 
 use crate::MAX_MESSAGE_LEN;
-
-const SILENT: &str = "@silent ";
-const MAXLEN_SILENT: usize = MAX_MESSAGE_LEN - SILENT.len();
 
 fn message_chunks_helper(input: impl Into<String>, len: usize) -> Vec<String> {
     let string: String = input.into();
@@ -25,34 +22,8 @@ fn message_chunks_helper(input: impl Into<String>, len: usize) -> Vec<String> {
     }
 }
 
-fn silent_message_chunks(input: impl Into<String>) -> Vec<String> {
-    message_chunks_helper(input, MAXLEN_SILENT)
-}
-
 fn message_chunks(input: impl Into<String>) -> Vec<String> {
     message_chunks_helper(input, MAX_MESSAGE_LEN)
-}
-
-fn wrapped_message_chunks_helper(
-    input: impl Into<String>,
-    prefix: impl AsRef<str>,
-    suffix: impl AsRef<str>,
-    len: usize,
-) -> Vec<String> {
-    let pre: &str = prefix.as_ref();
-    let suf: &str = suffix.as_ref();
-    message_chunks_helper(input, len.strict_sub(pre.len()).strict_sub(suf.len()))
-        .into_iter()
-        .map(|x| format!("{pre}{x}{suf}"))
-        .collect()
-}
-
-fn wrapped_silent_message_chunks(
-    input: impl Into<String>,
-    prefix: impl AsRef<str>,
-    suffix: impl AsRef<str>,
-) -> Vec<String> {
-    wrapped_message_chunks_helper(input, prefix, suffix, MAXLEN_SILENT)
 }
 
 fn wrapped_message_chunks(
@@ -60,65 +31,39 @@ fn wrapped_message_chunks(
     prefix: impl AsRef<str>,
     suffix: impl AsRef<str>,
 ) -> Vec<String> {
-    let input = input.into();
     let pre: &str = prefix.as_ref();
     let suf: &str = suffix.as_ref();
-    let first = MAX_MESSAGE_LEN.strict_sub(pre.len()).strict_sub(suf.len());
-    if input.len() <= first {
-        vec![format!("{pre}{input}{suf}")]
-    } else {
-        let mut iter = input.chars();
-        let mut parts = Vec::new();
-        let first_part = parts.push_mut(String::with_capacity(first));
-        first_part.push_str(pre);
-        for _ in 0..first {
-            let Some(ch) = iter.next() else {
-                unreachable!()
-            };
-            first_part.push(ch);
-        }
-        first_part.push_str(suf);
-        let input: String = iter.collect();
-        wrapped_silent_message_chunks(input, prefix, suffix)
-            .into_iter()
-            .fold(parts, |mut p, x| {
-                p.push(x);
-                p
-            })
-    }
-}
-
-pub async fn silent_message(
-    ctx: &Context,
-    msg: &Message,
-    value: impl Into<String>,
-) -> Result<(), SerenityError> {
-    let value = format!("{SILENT}{}", value.into());
-    assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
-    message_helper(ctx, msg, value).await
-}
-
-pub async fn message(
-    ctx: &Context,
-    msg: &Message,
-    value: impl Into<String>,
-) -> Result<(), SerenityError> {
-    let value = value.into();
-    assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
-    message_helper(ctx, msg, value).await
+    message_chunks_helper(
+        input,
+        MAX_MESSAGE_LEN.strict_sub(pre.len()).strict_sub(suf.len()),
+    )
+    .into_iter()
+    .map(|x| format!("{pre}{x}{suf}"))
+    .collect()
 }
 
 async fn message_helper(
     ctx: &Context,
     msg: &Message,
     value: impl Into<String>,
+    silent: bool,
 ) -> Result<(), SerenityError> {
+    let flags = if silent {
+        MessageFlags::SUPPRESS_NOTIFICATIONS
+    } else {
+        MessageFlags::empty()
+    };
     match msg.channel_id.say(&ctx.http, value).await {
         Ok(_) => Ok(()),
         Err(err @ SerenityError::Model(ModelError::MessageTooLong(code))) => {
             if let Err(why) = msg
                 .channel_id
-                .say(&ctx.http, format!("Output too long: {code}"))
+                .send_message(
+                    &ctx.http,
+                    CreateMessage::new()
+                        .content(format!("Output too long: {code}"))
+                        .flags(flags),
+                )
                 .await
             {
                 eprintln!("Error: {why:#?}");
@@ -130,7 +75,12 @@ async fn message_helper(
         Err(err) => {
             if let Err(why) = msg
                 .channel_id
-                .say(&ctx.http, format!("Error: {err:#?}"))
+                .send_message(
+                    &ctx.http,
+                    CreateMessage::new()
+                        .content(format!("Error: {err:#?}"))
+                        .flags(flags),
+                )
                 .await
             {
                 eprintln!("Error: {why:#?}");
@@ -139,6 +89,28 @@ async fn message_helper(
         }
     }
 }
+
+pub async fn silent_message(
+    ctx: &Context,
+    msg: &Message,
+    value: impl Into<String>,
+) -> Result<(), SerenityError> {
+    let value = value.into();
+    assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
+    message_helper(ctx, msg, value, true).await
+}
+
+#[expect(dead_code, reason = "We may want the option later...")]
+pub async fn message(
+    ctx: &Context,
+    msg: &Message,
+    value: impl Into<String>,
+) -> Result<(), SerenityError> {
+    let value = value.into();
+    assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
+    message_helper(ctx, msg, value, false).await
+}
+
 #[expect(dead_code, reason = "We may want the option later...")]
 pub async fn message_in_chunks<A: AsRef<str>, B: AsRef<str>>(
     ctx: &Context,
@@ -151,13 +123,8 @@ pub async fn message_in_chunks<A: AsRef<str>, B: AsRef<str>>(
         None => message_chunks(value),
     };
     for (i, string) in parts.iter().enumerate() {
-        if i == 0 {
-            debug_assert!(string.len() <= MAX_MESSAGE_LEN);
-            message(ctx, msg, string).await?;
-        } else {
-            debug_assert!(string.len() <= MAXLEN_SILENT);
-            silent_message(ctx, msg, string).await?;
-        }
+        debug_assert!(string.len() <= MAX_MESSAGE_LEN);
+        message_helper(ctx, msg, string, i != 0).await?;
     }
     Ok(())
 }
@@ -169,11 +136,11 @@ pub async fn silent_message_in_chunks<A: AsRef<str>, B: AsRef<str>>(
     wrapper: Option<(A, B)>,
 ) -> Result<(), SerenityError> {
     let parts = match wrapper {
-        Some((prefix, suffix)) => wrapped_silent_message_chunks(value, prefix, suffix),
-        None => silent_message_chunks(value),
+        Some((prefix, suffix)) => wrapped_message_chunks(value, prefix, suffix),
+        None => message_chunks(value),
     };
     for string in parts.iter() {
-        debug_assert!(string.len() <= MAXLEN_SILENT);
+        debug_assert!(string.len() <= MAX_MESSAGE_LEN);
         silent_message(ctx, msg, string).await?;
     }
     Ok(())
