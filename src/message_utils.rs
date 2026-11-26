@@ -53,7 +53,11 @@ async fn message_helper(
     } else {
         MessageFlags::empty()
     };
-    match msg.channel_id.say(&ctx.http, value).await {
+    match msg
+        .channel_id
+        .send_message(&ctx.http, CreateMessage::new().content(value).flags(flags))
+        .await
+    {
         Ok(_) => Ok(()),
         Err(err @ SerenityError::Model(ModelError::MessageTooLong(code))) => {
             if let Err(why) = msg
