@@ -18,7 +18,7 @@ impl EventHandler for Handler {
 
         let args = match shlex::split(&msg.content) {
             None => {
-                _ = message_utils::message_silent(&ctx, &msg, "Syntax error!").await;
+                _ = message_utils::silent_message(&ctx, &msg, "Syntax error!").await;
                 return;
             }
             Some(x) => x,
@@ -27,7 +27,7 @@ impl EventHandler for Handler {
         let call = match BotParser::try_parse_from(args.into_iter()) {
             Ok(call) => call,
             Err(err) => {
-                _ = message_utils::message_split(
+                _ = message_utils::silent_message_in_chunks(
                     &ctx,
                     &msg,
                     err.to_string(),
@@ -42,7 +42,7 @@ impl EventHandler for Handler {
 
         _ = match block {
             Some(lang) => {
-                message_utils::message_split(
+                message_utils::silent_message_in_chunks(
                     &ctx,
                     &msg,
                     output,
@@ -50,7 +50,7 @@ impl EventHandler for Handler {
                 )
                 .await
             }
-            None => message_utils::message_split::<!, !>(&ctx, &msg, output, None).await,
+            None => message_utils::silent_message_in_chunks::<!, !>(&ctx, &msg, output, None).await,
         };
     }
 }
