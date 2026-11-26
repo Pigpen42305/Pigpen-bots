@@ -2,7 +2,11 @@ mod awa;
 mod bytes;
 mod source;
 
-pub type DiscordOutput = (Option<&'static str>, String);
+pub struct DiscordOutput {
+    pub block: Option<&'static str>,
+    pub content: String,
+    pub suppress_embeds: bool,
+}
 
 trait Command: clap::Args {
     fn execute(self) -> Result<DiscordOutput, !>;

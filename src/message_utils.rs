@@ -42,17 +42,33 @@ fn wrapped_message_chunks(
     .collect()
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct MessageOptions {
+    pub silent: bool,
+    pub suppress_embeds: bool,
+}
+impl Default for MessageOptions {
+    fn default() -> Self {
+        Self {
+            silent: true,
+            suppress_embeds: false,
+        }
+    }
+}
+
 async fn message_helper(
     ctx: &Context,
     msg: &Message,
     value: impl Into<String>,
-    silent: bool,
+    options: MessageOptions,
 ) -> Result<(), SerenityError> {
-    let flags = if silent {
-        MessageFlags::SUPPRESS_NOTIFICATIONS
-    } else {
-        MessageFlags::empty()
-    };
+    let mut flags = MessageFlags::empty();
+    if options.silent {
+        flags |= MessageFlags::SUPPRESS_NOTIFICATIONS;
+    }
+    if options.suppress_embeds {
+        flags |= MessageFlags::SUPPRESS_EMBEDS;
+    }
     match msg
         .channel_id
         .send_message(&ctx.http, CreateMessage::new().content(value).flags(flags))
@@ -98,10 +114,12 @@ pub async fn silent_message(
     ctx: &Context,
     msg: &Message,
     value: impl Into<String>,
+    mut options: MessageOptions,
 ) -> Result<(), SerenityError> {
+    options.silent = true;
     let value = value.into();
     assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
-    message_helper(ctx, msg, value, true).await
+    message_helper(ctx, msg, value, options).await
 }
 
 #[expect(dead_code, reason = "We may want the option later...")]
@@ -109,10 +127,12 @@ pub async fn message(
     ctx: &Context,
     msg: &Message,
     value: impl Into<String>,
+    mut options: MessageOptions,
 ) -> Result<(), SerenityError> {
+    options.silent = false;
     let value = value.into();
     assert!(value.len() <= MAX_MESSAGE_LEN, "MAX LENGTH EXCEEDED!");
-    message_helper(ctx, msg, value, false).await
+    message_helper(ctx, msg, value, options).await
 }
 
 #[expect(dead_code, reason = "We may want the option later...")]
@@ -121,14 +141,16 @@ pub async fn message_in_chunks<A: AsRef<str>, B: AsRef<str>>(
     msg: &Message,
     value: impl Into<String>,
     wrapper: Option<(A, B)>,
+    mut options: MessageOptions,
 ) -> Result<(), SerenityError> {
     let parts = match wrapper {
         Some((prefix, suffix)) => wrapped_message_chunks(value, prefix, suffix),
         None => message_chunks(value),
     };
     for (i, string) in parts.iter().enumerate() {
+        options.silent = i != 0;
         debug_assert!(string.len() <= MAX_MESSAGE_LEN);
-        message_helper(ctx, msg, string, i != 0).await?;
+        message_helper(ctx, msg, string, options).await?;
     }
     Ok(())
 }
@@ -138,14 +160,16 @@ pub async fn silent_message_in_chunks<A: AsRef<str>, B: AsRef<str>>(
     msg: &Message,
     value: impl Into<String>,
     wrapper: Option<(A, B)>,
+    mut options: MessageOptions,
 ) -> Result<(), SerenityError> {
+    options.silent = true;
     let parts = match wrapper {
         Some((prefix, suffix)) => wrapped_message_chunks(value, prefix, suffix),
         None => message_chunks(value),
     };
     for string in parts.iter() {
         debug_assert!(string.len() <= MAX_MESSAGE_LEN);
-        silent_message(ctx, msg, string).await?;
+        silent_message(ctx, msg, string, options).await?;
     }
     Ok(())
 }

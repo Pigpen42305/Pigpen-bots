@@ -32,6 +32,10 @@ impl Command {
 }
 impl super::Command for Command {
     fn execute(self) -> Result<super::DiscordOutput, !> {
-        Ok((Some("text"), self.build_pyramid()))
+        Ok(super::DiscordOutput {
+            block: Some("text"),
+            content: self.build_pyramid(),
+            suppress_embeds: true,
+        })
     }
 }

@@ -4,7 +4,12 @@ use serenity::{
     async_trait,
 };
 
-use crate::{PREFIX, message_utils, parser::BotParser};
+use crate::{
+    PREFIX,
+    commands::DiscordOutput,
+    message_utils::{self, MessageOptions},
+    parser::BotParser,
+};
 
 pub struct Handler;
 
@@ -16,9 +21,11 @@ impl EventHandler for Handler {
             None => return,
         }
 
+        let mut options = MessageOptions::default();
+
         let args = match shlex::split(&msg.content) {
             None => {
-                _ = message_utils::silent_message(&ctx, &msg, "Syntax error!").await;
+                _ = message_utils::silent_message(&ctx, &msg, "Syntax error!", options).await;
                 return;
             }
             Some(x) => x,
@@ -32,25 +39,36 @@ impl EventHandler for Handler {
                     &msg,
                     err.to_string(),
                     Some(("```text\n", "\n```")),
+                    options,
                 )
                 .await;
                 return;
             }
         };
 
-        let (block, output) = call.execute().expect("A fatal error has occurred!");
+        let DiscordOutput {
+            block,
+            content,
+            suppress_embeds,
+        } = call.execute().expect("A fatal error has occurred!");
+
+        options.suppress_embeds = suppress_embeds;
 
         _ = match block {
             Some(lang) => {
                 message_utils::silent_message_in_chunks(
                     &ctx,
                     &msg,
-                    output,
+                    content,
                     Some((format!("```{lang}\n"), "\n```")),
+                    options,
                 )
                 .await
             }
-            None => message_utils::silent_message_in_chunks::<!, !>(&ctx, &msg, output, None).await,
+            None => {
+                message_utils::silent_message_in_chunks::<!, !>(&ctx, &msg, content, None, options)
+                    .await
+            }
         };
     }
 }

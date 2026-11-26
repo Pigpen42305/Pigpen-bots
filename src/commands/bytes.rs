@@ -21,12 +21,12 @@ impl super::Command for Command {
             verbose,
         } = self;
 
-        let mut output_string = String::new();
+        let mut content = String::new();
         let numbers = input.into_bytes();
 
         if verbose {
             let string = String::from_utf8_lossy(&numbers);
-            output_string.push_str(&format!("Input: {}\nOutput: ", string.trim_end()));
+            content.push_str(&format!("Input: {}\nOutput: ", string.trim_end()));
         }
 
         let output: String = {
@@ -37,11 +37,15 @@ impl super::Command for Command {
                 .join(" ")
         };
 
-        output_string.push_str(&output);
+        content.push_str(&output);
 
         let block = if markdown { Some("text") } else { None };
 
-        Ok((block, output_string))
+        Ok(super::DiscordOutput {
+            block,
+            content,
+            suppress_embeds: true,
+        })
     }
 }
 
