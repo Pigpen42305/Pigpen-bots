@@ -18,7 +18,7 @@ impl EventHandler for Handler {
 
         let args = match shlex::split(&msg.content) {
             None => {
-                _ = message_utils::message(&ctx, &msg, "Syntax error!").await;
+                _ = message_utils::message_silent(&ctx, &msg, "Syntax error!").await;
                 return;
             }
             Some(x) => x,
