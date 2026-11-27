@@ -1,6 +1,8 @@
 mod awa;
 mod bytes;
+mod privacy_policy;
 mod source;
+mod terms_of_service;
 
 pub struct DiscordOutput {
     pub block: Option<&'static str>,
@@ -21,6 +23,10 @@ pub enum Commands {
     Awa(awa::Command),
     /// Get a link to this bot's repository!
     Source(source::Command),
+    /// Get a link to this bot's privacy policy.
+    PrivacyPolicy(privacy_policy::Command),
+    /// Get a link to this bot's terms of service.
+    TermsOfService(terms_of_service::Command),
 }
 impl Commands {
     pub fn execute(self) -> Result<DiscordOutput, !> {
@@ -29,6 +35,8 @@ impl Commands {
             Commands::Bytes(cmd) => cmd.execute(),
             Commands::Awa(cmd) => cmd.execute(),
             Commands::Source(cmd) => cmd.execute(),
+            Commands::PrivacyPolicy(cmd) => cmd.execute(),
+            Commands::TermsOfService(cmd) => cmd.execute(),
             _ => unreachable!(),
         }
     }
