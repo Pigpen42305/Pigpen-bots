@@ -10,7 +10,7 @@ use std::env::var;
 
 use serenity::prelude::*;
 
-const PREFIX: &str = "/bot ";
+const PREFIX: &str = "/awa ";
 
 const _: () = const {
     const END: u8 = PREFIX.as_bytes()[PREFIX.len() - 1];
