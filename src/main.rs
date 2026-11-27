@@ -2,6 +2,7 @@ mod commands;
 #[cfg(debug_assertions)]
 mod env_utils;
 mod handler;
+mod logging;
 mod message_utils;
 mod parser;
 
@@ -9,11 +10,24 @@ use std::env::var;
 
 use serenity::prelude::*;
 
-const PREFIX: &str = "/bot";
+const PREFIX: &str = "/bot ";
+
+const _: () = const {
+    const END: u8 = PREFIX.as_bytes()[PREFIX.len() - 1];
+    assert!(
+        (END == b' ') || (END == b'\n'),
+        "The PREFIX must end with a space or newline character!"
+    )
+};
+
 const MAX_MESSAGE_LEN: usize = 2000;
 
 #[tokio::main]
 async fn main() {
+    let Ok(_guard) = logging::setup_logging() else {
+        panic!("Failed to setup the logger!");
+    };
+
     #[cfg(debug_assertions)]
     if !env_utils::setup_env().unwrap_or(false) {
         panic!("Expected the DISCORD_TOKEN in the environment...")
