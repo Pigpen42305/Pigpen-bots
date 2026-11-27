@@ -3,8 +3,8 @@ foreach ($line in Get-Content -Path '.\.env') {
         continue
     }
     ($name, $value) = $line.Split('=')
-    New-Item -Path "Env:\$name" -Value $value
+    $null = New-Item -Path "Env:\$name" -Value $value -Force
     Remove-Variable -Name 'line','name','value'
 }
 
-cargo.exe run --release
+cargo run --release
